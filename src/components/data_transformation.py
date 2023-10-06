@@ -1,213 +1,94 @@
 import os, sys #type:ignore
 import pandas as pd
-import numpy as np
-from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, OrdinalEncoder
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import RobustScaler, MinMaxScaler
-from src.constant import TARGET_COLUMN
-from dataclasses import dataclass
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
 from src.exceptions import CustomException
 from src.logger import logging
-from src.utils.main_utils import MainUtils
-import pickle
+from src.utils import save_pkl
 from dataclasses import dataclass #type:ignore
-from src.constant import *
 
 @dataclass
 class DataTransformationConfig:
-    pkl_path = os.path.join(artifact_folder, transformer_file)
-    raw_file_path = os.path.join(artifact_folder, raw_file_name)
-    train_file_path = os.path.join(artifact_folder, train_file_name)
-    test_file_path = os.path.join(artifact_folder, test_file_name)
-    user_csv_path = os.path.join(artifact_folder, user_file_name)
-
+    pkl_path = os.path.join('artifacts', 'transformer.pkl')
 
 class DataTransformation:
-    def __init__(self, feature_store_file_path):
-        self.feature_store_file_path = feature_store_file_path
+    def __init__(self):
         self.config = DataTransformationConfig()
     
-        # Add other initialization parameters if needed
+    # A function for getting transformer object
+    def get_transformer(self):
+        logging.info('Creating the transformer object')
+        # Defining the numerical columns
+        num_columns = ['Age', 'Subscription_Length_Months', 'Monthly_Bill', 'Total_Usage_GB']
 
-    def load_data(self):
+        # Creating a pipeline for numerical columns
+        num_pipe = Pipeline(
+            steps = [
+                ('Imputer', SimpleImputer(strategy='mean')),
+                ('Scaler', StandardScaler())
+            ]
+        )
+
+        # Creating a pipeline for Location column
+        hotEncode_pipe = Pipeline(
+            steps = [
+                ('oneHot', OneHotEncoder())
+            ]
+        )
+
+        # Creating a pipeline for Gender column
+        ordinalEncode_pipe = Pipeline(
+            steps = [
+                ('label', OrdinalEncoder())
+            ]
+        )
+
+        # Combining all the pipelines in a single ColumnTransformer
+        transformer = ColumnTransformer(
+            transformers= [
+                ('num_columns', num_pipe, num_columns),
+                ('HotEncode', hotEncode_pipe, ['Location']),
+                ('ordinalEncode', ordinalEncode_pipe, ['Gender'])
+            ],
+            remainder='drop'
+        )
+
+        return transformer    
+
+    def transformData(self, train_path, test_path):
         try:
-            # Read the data from the specified feature store file path
-            data = pd.read_csv(self.feature_store_file_path)
+            logging.info('Data Transformation initiated...')
+            # Reading train and test dataset
+            train_df = pd.read_excel(train_path)
+            test_df = pd.read_excel(test_path)
+
+            # Segregating X and y features
+            X_train = train_df.drop('Churn', axis = 1)
+            X_test = test_df.drop('Churn', axis = 1)
+            y_train = train_df[['Churn']]
+            y_test = test_df[['Churn']]
+
+            transformer = self.get_transformer()
+
+            # Transforming the dataset
+            X_train = pd.DataFrame(transformer.fit_transform(X_train), columns=transformer.get_feature_names_out())
+            X_test = pd.DataFrame(transformer.transform(X_test), columns=transformer.get_feature_names_out())
             
-            if 'CustomerID' in data.columns and 'Name' in data.columns:
-                data.drop(['CustomerID', 'Name'], axis=1, inplace=True)
-            else:
-                # Do nothing if the columns are not present
-                pass
+            # Combining the y to form a complete dataset
+            train_df = pd.concat([X_train, y_train], axis = 1)
+            test_df = pd.concat([X_test, y_test], axis = 1)
 
-            # Encode categorical variables
-            possible_genders = ['Male', 'Female']  # Add more if needed
-            possible_locations = ['Chicago', 'Houston',	'Los Angeles', 'Miami', 'New York']  # Add more if needed
+            logging.info('Data is transformed successfully')
+            logging.info(train_df.head())
+            logging.info(test_df.head())
 
-            # Create dummy columns for Gender and Location
-            for gender in possible_genders:
-                data[f'Gender_{gender}'] = (data['Gender'] == gender).astype(int)
+            save_pkl(self.config.pkl_path, transformer)
+            logging.info(f'Transformer file is saved successful at {self.config.pkl_path}')
 
-            for location in possible_locations:
-                data[f'Location_{location}'] = (data['Location'] == location).astype(int)
-
-            # Drop the original Gender and Location columns
-            data.drop(['Gender', 'Location'], axis=1, inplace=True)
-            
-            
-            # Define age ranges and create age-related features
-            age_ranges = [(0, 20), (21, 30), (31, 40), (41, 50), (51, 60), (61, 200)]
-            age_labels = ["Age_0_20", "Age_21_30", "Age_31_40", "Age_41_50", "Age_51_60", "Age_61_200"]
-
-            for age_range, age_label in zip(age_ranges, age_labels):
-                data[age_label] = ((data['Age'] >= age_range[0]) & (data['Age'] <= age_range[1])).astype(int)
-
-            # Define subscription length threshold and create a related feature
-            subscription_length_threshold = 12
-            data['Subscription_Category_Short-Term'] = data['Subscription_Length_Months'].apply(
-                lambda x: 1 if x <= subscription_length_threshold else 0
-            )
-
-            data['Subscription_Category_Long-Term'] = data['Subscription_Length_Months'].apply(
-                lambda x: 1 if x > subscription_length_threshold else 0
-            )
-
-            # Create additional features
-            data['Billing_to_Usage_Ratio'] = data['Monthly_Bill'] / data['Total_Usage_GB']
-            data['Total_Paid'] = data['Subscription_Length_Months'] * data['Monthly_Bill']
-            data['Per_GB_Price'] = data['Monthly_Bill'] * data['Subscription_Length_Months'] / data['Total_Usage_GB']
-            
-            
-            data.to_csv(self.config.raw_file_path, index = False) 
-            return data
-
-        except Exception as e:
-            # Handle exceptions and log errors here
-            print(f"Error during data loading and transformation: {e}")
-            return None
-
-    def split_data(self):
-        try:
-            data= self.load_data()
-            # Split data into train and test sets
-            
-            if data.shape[0]>1:
-                X = data.drop('Churn', axis=1)
-                y = data['Churn']
-                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-                # Again concating the X and y of train and test data to make two complete datasets
-                # Concatenate X_train and y_train along axis=1
-                train_df = pd.concat([X_train, y_train], axis=1)
-
-                # Concatenate X_test and y_test along axis=1
-                test_df = pd.concat([X_test, y_test], axis=1)
-
-                
-                train_df.to_csv(self.config.train_file_path, index = False)
-                test_df.to_csv(self.config.test_file_path, index = False)
-            
-                return X_train, X_test, y_train, y_test , data
-            else: 
-            
-                return data
-
+            return train_df, test_df
         
-
         except Exception as e:
-            # Handle exceptions and log errors here
-            logging.info('Error in split data of dataset')
+            logging.info('Error while transforming dataset')
             raise CustomException(e, sys) # type: ignore
-
-    def preprocess_data(self):
-        # ... (existing code for imputation and scaling)
-        try:
-            
-            # Transformation and scaling on specified columns
-            X_train, X_test, y_train, y_test , data= self.split_data()  # Get data from split_data method
-            
-            columns_to_transform = ['Billing_to_Usage_Ratio', 'Per_GB_Price']
-
-            for col in columns_to_transform:
-                if col in X_train.columns:
-                    X_train[col] = np.log(X_train[col])
-                    X_test[col] = np.log(X_test[col])
-                    
-            X_train['Total_Paid']= np.sqrt(X_train['Total_Paid'])
-            X_test['Total_Paid']= np.sqrt(X_test['Total_Paid'])
-
-            # Additional scaling on numerical features
-            numerical_features = ['Age', 'Subscription_Length_Months', 'Monthly_Bill', 'Total_Usage_GB', 'Billing_to_Usage_Ratio', 'Total_Paid', 'Per_GB_Price']
-
-            scaler = MinMaxScaler()
-            X_train[numerical_features] = scaler.fit_transform(X_train[numerical_features])
-            X_test[numerical_features] = scaler.transform(X_test[numerical_features])
-
-            return X_train, X_test, y_train, y_test , data    
-        
-        except Exception as e:
-            logging.info('Error while preprocessing of dataset')
-            raise CustomException(e, sys) # type: ignore
-        
-    def save_transformation(self):
-        # Save the instance of the transformation class to a pickle file
-        try :
-            X_train, X_test, y_train, y_test , data= self.preprocess_data()
-            
-            self.utils =  MainUtils()
-            
-            os.makedirs(os.path.dirname(self.config.pkl_path), exist_ok= True)
-            self.utils.save_object(
-                file_path=self.config.pkl_path,
-                obj=self)
-
-            return X_train, X_test, y_train, y_test , data
-    
-        except Exception as e:
-            logging.info('Error while saving of transformer pickle file')
-            raise CustomException(e, sys) # type: ignore
-    
-    
-    def user_transformer(self, traincsv_path):
-        # train_file_path = train_csv_path
-        
-        # user_csv= pd.read_csv(self.feature_store_file_path)
-          
-        X_user = self.split_data()
-        
-        # data = pd.read_csv(self.feature_store_file_path)
-        
-        columns_to_transform = ['Billing_to_Usage_Ratio', 'Per_GB_Price']
-
-        for col in columns_to_transform:
-            if col in X_user.columns:
-                X_user[col] = np.log(X_user[col])
-
-        X_user['Total_Paid']= np.sqrt(X_user['Total_Paid'])
-
-        
-        X_trn =  pd.read_csv(traincsv_path,  encoding= 'unicode_escape')
-        
-    
-        # Additional scaling on numerical features
-        numerical_features = ['Age', 'Subscription_Length_Months', 'Monthly_Bill', 'Total_Usage_GB', 'Billing_to_Usage_Ratio', 'Total_Paid', 'Per_GB_Price']
-
-        scaler = MinMaxScaler()
-        X_trn[numerical_features] = scaler.fit_transform(X_trn[numerical_features])
-        X_user[numerical_features] = scaler.transform(X_user[numerical_features])
-        
-        return X_user
-        
-# if __name__ == "__main__":
-#     feature_store_file_path = "your_data.csv"  # Replace with your data file path
-#     transformation = DataTransformation(feature_store_file_path)
-
-#     # Perform data transformation and preprocessing
-#     X_train, X_test, y_train, y_test, data = transformation.preprocess_data()
-
-#     # Save the transformation object to a pickle file
-#     output_pickle_path = "transformation.pkl"  # Specify the path where you want to save the pickle file
-#     transformation.save_transformation(output_pickle_path)
-#         # Create a preprocessing pipeline
-
-
-

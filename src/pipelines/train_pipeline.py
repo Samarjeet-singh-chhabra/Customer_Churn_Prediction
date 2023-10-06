@@ -6,23 +6,21 @@ from src.logger import logging
 
 def run_pipeline():
     # Data Ingestion
-    inject_data = DataIngestion()
-    raw_file_path = inject_data.injectData()
+    inject_obj = DataIngestion()
+    _, train_path, test_path = inject_obj.injectData('notebooks/data/customer_churn_large_dataset.xlsx')
     print('Data Ingestion Succesfull')
-    logging.info('-----------------------------------Final Data Ingested-----------------------------------')
- 
+    logging.info(f'Train datafile is stored at {train_path}')
+    logging.info(f'Test datafile is stored at {test_path}')
 
     # Data Transforming
-    transform_obj = DataTransformation(raw_file_path)
-    X_train, X_test, y_train, y_test , data = transform_obj.save_transformation()
+    transform_obj = DataTransformation()
+    train_df, test_df = transform_obj.transformData(train_path=train_path, test_path=test_path)
     print('Data Transformed successfully')
-    logging.info('-----------------------------------Final Data Transformer-----------------------------------')
 
     # Model Training
     trainer_obj = ModelTraining()
-    trainer_obj.train_model(X_train, X_test, y_train, y_test)
+    trainer_obj.train_model(train_df, test_df)
     print('Model Trained successfully')
-    logging.info('-----------------------------------Final trained-----------------------------------')
     
 if __name__ == '__main__':
     run_pipeline()

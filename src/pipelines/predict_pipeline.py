@@ -1,10 +1,8 @@
 import os, sys 
 from src.exceptions import CustomException
-from src.components.data_transformation import DataTransformation
-from src.utils.main_utils import MainUtils
+from src.utils import load_pkl
 from src.logger import logging
 import pandas as pd
-from src.constant import *
 
 class ModelPrediction:
     def __init__(self):
@@ -13,44 +11,61 @@ class ModelPrediction:
     def prediction(self, input_data):
         try:
             # Creating the path for locating all the pickle files
-            logging.info('-----------------------------------Recieved User dataframe-----------------------------------')
-            model_pkl_path = os.path.join(artifact_folder,model_file)
-            
-            self.utils =  MainUtils()
+            transformer_pkl_path = os.path.join('artifacts', 'transformer.pkl')
+            model_pkl_path = os.path.join('artifacts', 'model.pkl')
+
             # Loading the pickle files
-            model =  self.utils.load_object(model_pkl_path)
-            logging.info('-----------------------------------Model loaded for prediction-----------------------------------')
-            
-            # user_csv_path = os.path.join(parent_dir, user_file_name) in constant --> __init__.py
-            os.makedirs(os.path.dirname(user_csv_path), exist_ok= True)
-            input_data.to_csv(user_csv_path, index = False)
-            
-            logging.info(f' USER CSV is succcesfully stored in {os.path.dirname(user_csv_path)} folder.')
-            
+            transformer = load_pkl(transformer_pkl_path)
+            model = load_pkl(model_pkl_path)
+
             # Preprocessing
-            # Data Transforming
-            transform_user = DataTransformation(user_csv_path)
-            # train_csv_path = os.path.join(parent_dir, train_file_name) in constant --> __init__.py
-            
-            X_user = transform_user.user_transformer(train_csv_path)
-            
-            print('Data Transformed successfully')
-            logging.info('-----------------------------------User Data Transformed-----------------------------------')
-
-
+            input_processed = transformer.transform(input_data)
 
             # Predicting
-            prediction = model.predict(X_user)
-            
-            logging.info('-----------------------------------User prediction DONE-----------------------------------')
-            
-            
-            return prediction
-            
+            prediction = model.predict_proba(input_processed)
 
-        
+            return prediction
         except Exception as e:
             logging.info('Error occured in Prediction Pipeline')
-            raise CustomException(e, sys) #type:ignore
+            raise CustomeException(e, sys) #type:ignore
 
 
+# Creating a class for transforming the input data into a dataframe
+class CustomData:
+    def __init__(self,
+                 CustomerID:int,
+                 Name:float,
+                 Age:int,
+                 Gender:str,
+                 Location:str,
+                 Subscription_Length_Months:int,
+                 Monthly_Bill:float,
+                 Total_Usage_GB:float):
+        
+        self.CustomerID = CustomerID
+        self.Name = Name
+        self.Age = Age
+        self.Gender = Gender
+        self.Location = Location
+        self.Subscription_Length_Months = Subscription_Length_Months
+        self.Monthly_Bill = Monthly_Bill
+        self.Total_Usage_GB = Total_Usage_GB
+
+    def data_to_dataframe(self):
+        try:
+            custom_data_input_dict = {
+                'CustomerID':[self.CustomerID],
+                'Name':[self.Name],
+                'Age':[self.Age],
+                'Subscription_Length_Months':[self.Subscription_Length_Months],
+                'Monthly_Bill':[self.Monthly_Bill],
+                'Total_Usage_GB':[self.Total_Usage_GB],
+                'Location':[self.Location],
+                'Gender':[self.Gender]
+            }
+            df = pd.DataFrame(custom_data_input_dict)
+            logging.info('Dataframe Gathered')
+            return df
+        except Exception as e:
+            logging.info('Exception Occured in prediction pipeline')
+            raise CustomeException(e,sys) # type: ignore
