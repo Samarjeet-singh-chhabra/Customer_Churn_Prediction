@@ -1,19 +1,12 @@
+flask
 pandas
 numpy
 scikit-learn
-matplotlib
-seaborn
-imbalanced-learn
-xgboost
-shap
-patsy
-statsmodels
 tensorflow
-graphviz
-pickle-mixin
+seaborn
+flask-cors
+openpyxl
 streamlit
-boto3
-PyYAML
-joblib
--e .
+graphviz
 
+-e .

@@ -107,6 +107,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
 # Streamlit UI elements
 gender = st.selectbox('Gender', ['Male', 'Female'])
 age = st.number_input('Age', min_value=0)

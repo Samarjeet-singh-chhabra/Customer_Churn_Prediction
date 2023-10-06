@@ -4,8 +4,7 @@ This project aims to predict customer churn in a telecommunications company usin
 
 In this project, we have developed a predictive model that can identify customers who are likely to churn, allowing the company to take proactive measures to retain them. We used a neural network model trained on historical customer data to make these predictions.
 
-![image](https://github.com/Samarjeet-singh-chhabra/Customer_Churn_Prediction/assets/67777707/f23de611-d86f-48f8-91f4-a08f965bfe80)
-
+![Screenshot (160)](https://github.com/Samarjeet-singh-chhabra/Customer_Churn_Prediction/assets/67777707/6196c88d-160f-4ee5-a725-4b768f9b8811)
 
 
 # Business context
