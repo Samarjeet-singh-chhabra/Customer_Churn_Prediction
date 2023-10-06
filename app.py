@@ -112,9 +112,9 @@ st.markdown(
 gender = st.selectbox('Gender', ['Male', 'Female'])
 age = st.number_input('Age', min_value=0)
 location = st.selectbox('Location', ['Los Angeles', 'New York', 'Miami', 'Houston', 'Chicago'])
-subscription_length = st.number_input('Subscription Length (Months)', min_value=0)
-monthly_bill = st.number_input('Monthly Bill', min_value=0.0)
-total_usage_gb = st.number_input('Total Usage GB', min_value=0.0)
+subscription_length = st.number_input('Subscription Length in Months', min_value=0)
+monthly_bill = st.number_input('Monthly Bill in Dollars', min_value=0.0)
+total_usage_gb = st.number_input('Total Usage in GB', min_value=0.0)
 
 
 
