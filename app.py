@@ -120,12 +120,12 @@ total_usage_gb = st.number_input('Total Usage GB', min_value=0.0)
 if st.button('Predict Churn'):
     # Prepare the data for the model
     data = pd.DataFrame({
-        'Age': [10],  # Use a list with a single value
-        'Gender': ['Male'],  # Use a list with a single value
-        'Location': ['Los Angeles'],  # Use a list with a single value
-        'Subscription_Length_Months': [5],  # Use a list with a single value
-        'Monthly_Bill': [100],  # Use a list with a single value
-        'Total_Usage_GB': [100]  # Use a list with a single value
+        'Age': [age],  # Use a list with a single value
+        'Gender': [gender],  # Use a list with a single value
+        'Location': [location],  # Use a list with a single value
+        'Subscription_Length_Months': [subscription_length],  # Use a list with a single value
+        'Monthly_Bill': [monthly_bill],  # Use a list with a single value
+        'Total_Usage_GB': [total_usage_gb]  # Use a list with a single value
     })
 
     # Calling prediction pipeline to predict the output
@@ -135,9 +135,13 @@ if st.button('Predict Churn'):
 
     # Return the prediction
     st.subheader('Churn Prediction:')
-    if x < 0.5:
-        st.write('The customer is likely to stay (Churn: No)')
+    if x[0][1] < 0.5:
+        st.write('The customer is likely to STAY')
     else:
-        st.write('The customer is likely to churn (Churn: Yes)')
+        st.write('The customer is likely to CHURN')
 
-#    streamlit run app.py
+    # Print the value of x
+    st.write(f'The chance of churning is : {round(x[0][1]* 100,2)} %')
+       
+    
+# streamlit run app.py
